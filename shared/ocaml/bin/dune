@@ -1,0 +1,14 @@
+(executable
+ (name steward_hook)
+ (public_name steward-hook)
+ (libraries steward unix))
+
+(executable
+ (name steward_search)
+ (public_name steward-search)
+ (libraries steward unix))
+
+(executable
+ (name steward_index)
+ (public_name steward-index)
+ (libraries steward unix lwt lwt.unix))

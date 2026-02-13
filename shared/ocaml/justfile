@@ -1,0 +1,70 @@
+# OCaml project recipes (claudes-steward)
+# Wraps opam local switch to eliminate env friction
+
+# ============================================================================
+# Environment
+# ============================================================================
+
+# All recipes run with the local opam switch activated
+set shell := ["bash", "-c"]
+opam_env := "eval $(opam env --switch=. --set-switch) &&"
+
+# ============================================================================
+# Build
+# ============================================================================
+
+# Build the project
+build:
+    {{opam_env}} dune build
+
+# Build in watch mode
+watch:
+    {{opam_env}} dune build --watch
+
+# Clean build artifacts
+clean:
+    {{opam_env}} dune clean
+
+# ============================================================================
+# Test
+# ============================================================================
+
+# Run all tests
+test:
+    {{opam_env}} dune runtest
+
+# Run tests in watch mode
+test-watch:
+    {{opam_env}} dune runtest --watch
+
+# ============================================================================
+# Development
+# ============================================================================
+
+# Open utop with project libraries loaded
+utop:
+    {{opam_env}} dune utop lib
+
+# Check types without building
+check:
+    {{opam_env}} dune build @check
+
+# Format code
+fmt:
+    {{opam_env}} dune fmt
+
+# ============================================================================
+# Dependencies
+# ============================================================================
+
+# Install opam dependencies
+deps:
+    opam install . --deps-only --yes
+
+# Update opam dependencies
+deps-update:
+    opam update && opam upgrade --yes
+
+# Show installed packages
+deps-list:
+    {{opam_env}} opam list --installed

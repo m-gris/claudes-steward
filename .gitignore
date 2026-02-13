@@ -1,0 +1,25 @@
+# Build artifacts
+shared/ocaml/_build/
+shared/ocaml/_opam/
+*.byte
+*.native
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Editor
+.vscode/
+*.swp
+*~
+
+# OS
+.DS_Store
+
+# Claude Code local settings (keep .claude/settings.json if present)
+.claude/projects/
+
+# Temporary files
+*.tmp
+*.log

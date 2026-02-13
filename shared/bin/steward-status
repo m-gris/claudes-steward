@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Show current Claude session states from steward.db
+
+DB="${STEWARD_DB:-$(dirname "$0")/../steward.db}"
+
+if [[ ! -f "$DB" ]]; then
+    echo "No steward.db found at $DB"
+    exit 1
+fi
+
+echo "Claude Sessions (from $DB)"
+echo "======================================"
+sqlite3 -header -column "$DB" "
+SELECT
+    tmux_location AS location,
+    state,
+    COALESCE(state_reason, '') AS reason,
+    substr(last_updated, 12, 8) AS time
+FROM sessions
+ORDER BY last_updated DESC;
+"

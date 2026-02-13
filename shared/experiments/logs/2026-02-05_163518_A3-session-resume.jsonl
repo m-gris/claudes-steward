@@ -1,0 +1,82 @@
+{
+  "timestamp": "2026-02-05 16:34:49.3N",
+  "event": "SessionStart",
+  "session_id": "da0251e0-50a6-4d89-b49f-545019c59640",
+  "cwd": "/Users/marc/DATA_PROG/AI-TOOLING/claudes-steward",
+  "tmux": {
+    "in_tmux": true,
+    "location": "claude-monitor:1.1",
+    "session": "claude-monitor",
+    "window": "1",
+    "pane": "1"
+  },
+  "payload": {
+    "session_id": "da0251e0-50a6-4d89-b49f-545019c59640",
+    "transcript_path": "/Users/marc/.claude/projects/-Users-marc-DATA-PROG-AI-TOOLING-claudes-steward/da0251e0-50a6-4d89-b49f-545019c59640.jsonl",
+    "cwd": "/Users/marc/DATA_PROG/AI-TOOLING/claudes-steward",
+    "hook_event_name": "SessionStart",
+    "source": "startup"
+  }
+}
+{
+  "timestamp": "2026-02-05 16:34:49.3N",
+  "event": "UserPromptSubmit",
+  "session_id": "da0251e0-50a6-4d89-b49f-545019c59640",
+  "cwd": "/Users/marc/DATA_PROG/AI-TOOLING/claudes-steward",
+  "tmux": {
+    "in_tmux": true,
+    "location": "claude-monitor:1.1",
+    "session": "claude-monitor",
+    "window": "1",
+    "pane": "1"
+  },
+  "payload": {
+    "session_id": "da0251e0-50a6-4d89-b49f-545019c59640",
+    "transcript_path": "/Users/marc/.claude/projects/-Users-marc-DATA-PROG-AI-TOOLING-claudes-steward/da0251e0-50a6-4d89-b49f-545019c59640.jsonl",
+    "cwd": "/Users/marc/DATA_PROG/AI-TOOLING/claudes-steward",
+    "permission_mode": "default",
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "List the files in the current directory"
+  }
+}
+{
+  "timestamp": "2026-02-05 16:34:58.3N",
+  "event": "Stop",
+  "session_id": "da0251e0-50a6-4d89-b49f-545019c59640",
+  "cwd": "/Users/marc/DATA_PROG/AI-TOOLING/claudes-steward",
+  "tmux": {
+    "in_tmux": true,
+    "location": "claude-monitor:1.1",
+    "session": "claude-monitor",
+    "window": "1",
+    "pane": "1"
+  },
+  "payload": {
+    "session_id": "da0251e0-50a6-4d89-b49f-545019c59640",
+    "transcript_path": "/Users/marc/.claude/projects/-Users-marc-DATA-PROG-AI-TOOLING-claudes-steward/da0251e0-50a6-4d89-b49f-545019c59640.jsonl",
+    "cwd": "/Users/marc/DATA_PROG/AI-TOOLING/claudes-steward",
+    "permission_mode": "default",
+    "hook_event_name": "Stop",
+    "stop_hook_active": false
+  }
+}
+{
+  "timestamp": "2026-02-05 16:34:58.3N",
+  "event": "SessionEnd",
+  "session_id": "da0251e0-50a6-4d89-b49f-545019c59640",
+  "cwd": "/Users/marc/DATA_PROG/AI-TOOLING/claudes-steward",
+  "tmux": {
+    "in_tmux": true,
+    "location": "claude-monitor:1.1",
+    "session": "claude-monitor",
+    "window": "1",
+    "pane": "1"
+  },
+  "payload": {
+    "session_id": "da0251e0-50a6-4d89-b49f-545019c59640",
+    "transcript_path": "/Users/marc/.claude/projects/-Users-marc-DATA-PROG-AI-TOOLING-claudes-steward/da0251e0-50a6-4d89-b49f-545019c59640.jsonl",
+    "cwd": "/Users/marc/DATA_PROG/AI-TOOLING/claudes-steward",
+    "hook_event_name": "SessionEnd",
+    "reason": "other"
+  }
+}

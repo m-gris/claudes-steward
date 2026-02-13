@@ -1,0 +1,58 @@
+# Qdrant server management for claudes-steward
+
+qdrant_bin := env("HOME") + "/.local/bin/qdrant"
+storage_dir := justfile_directory() + "/storage"
+port := "6333"
+
+# Start Qdrant server (foreground)
+start:
+    cd {{justfile_directory()}} && {{qdrant_bin}} --config-path config/config.yaml
+
+# Start Qdrant server (background)
+start-bg:
+    cd {{justfile_directory()}} && nohup {{qdrant_bin}} --config-path config/config.yaml > qdrant.log 2>&1 &
+    @echo "Qdrant started on port {{port}}, logs at {{justfile_directory()}}/qdrant.log"
+    @sleep 1
+    @just health
+
+# Stop Qdrant server
+stop:
+    pkill -f "qdrant --storage-path" || echo "Qdrant not running"
+
+# Check health (root endpoint in v1.16+)
+health:
+    curl -s http://localhost:{{port}}/ | jq '{version, title}' || echo "Qdrant not responding"
+
+# Show collections
+collections:
+    curl -s http://localhost:{{port}}/collections | jq .
+
+# Create transcript collection (1024 dims for mxbai-embed-large)
+create-collection:
+    curl -X PUT http://localhost:{{port}}/collections/transcripts \
+      -H "Content-Type: application/json" \
+      -d '{ \
+        "vectors": { \
+          "dense": { "size": 1024, "distance": "Cosine" } \
+        }, \
+        "sparse_vectors": { \
+          "bm25": {} \
+        }, \
+        "payload_schema": { \
+          "session_id": { "data_type": "Keyword", "indexed": true }, \
+          "project_path": { "data_type": "Keyword", "indexed": true }, \
+          "timestamp": { "data_type": "Datetime", "indexed": true } \
+        } \
+      }' | jq .
+
+# Delete transcript collection (careful!)
+delete-collection:
+    curl -X DELETE http://localhost:{{port}}/collections/transcripts | jq .
+
+# Show collection info
+info:
+    curl -s http://localhost:{{port}}/collections/transcripts | jq .
+
+# Tail logs
+logs:
+    tail -f {{justfile_directory()}}/qdrant.log

@@ -1,0 +1,19 @@
+opam-version: "2.0"
+name: "steward_hook"
+version: "0.1.0"
+synopsis: "Claude Code hook handler for claudes-steward"
+maintainer: ["Marc"]
+depends: [
+  "ocaml" {>= "5.2.0"}
+  "dune" {>= "3.0"}
+  "yojson"
+  "sqlite3"
+  "lwt"
+  "lwt_ppx"
+  "cohttp-lwt-unix"
+  "alcotest" {with-test}
+  "alcotest-lwt" {with-test}
+]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+]
