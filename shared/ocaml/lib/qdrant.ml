@@ -85,16 +85,24 @@ let upsert_points (config : qdrant_config) (chunks : embedded_chunk list) : qdra
         (try
           let json = Yojson.Safe.from_string output in
           let open Yojson.Safe.Util in
-          let status = json |> member "status" |> to_string_option in
-          match status with
-          | Some "ok" -> Qd_ok
-          | Some s -> Qd_error (Printf.sprintf "Qdrant returned status: %s" s)
-          | None ->
+          let status_field = json |> member "status" in
+          (* Qdrant returns status as string "ok" on success, or object {"error": "..."} on failure *)
+          match status_field with
+          | `String "ok" -> Qd_ok
+          | `String s -> Qd_error (Printf.sprintf "Qdrant returned status: %s" s)
+          | `Assoc _ ->
+              (* Error case: {"status": {"error": "message"}} *)
+              let error_msg = status_field |> member "error" |> to_string_option in
+              (match error_msg with
+              | Some msg -> Qd_error (Printf.sprintf "Qdrant error: %s" msg)
+              | None -> Qd_error (Printf.sprintf "Unexpected status object: %s" (Yojson.Safe.to_string status_field)))
+          | `Null ->
               (* Check for result.status *)
               let result_status = json |> member "result" |> member "status" |> to_string_option in
               (match result_status with
               | Some "completed" -> Qd_ok
               | _ -> Qd_error (Printf.sprintf "Unexpected response: %s" output))
+          | _ -> Qd_error (Printf.sprintf "Unexpected status type: %s" output)
         with
         | Yojson.Json_error msg -> Qd_error ("JSON parse error: " ^ msg)
         | Yojson.Safe.Util.Type_error (msg, _) -> Qd_error ("JSON type error: " ^ msg))

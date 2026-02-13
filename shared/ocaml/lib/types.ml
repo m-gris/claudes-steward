@@ -208,19 +208,25 @@ type index_chunk = {
    ============================================================ *)
 
 (** Maximum characters per chunk.
-    Very conservative limit safe for worst-case tokenization (shell output
-    with escape sequences can tokenize at >2.5 tokens/char).
-    2500 chars * 3 = 7500 tokens max, leaving ~700 token headroom in 8192 context. *)
+    Based on analysis of 205 failing chunks (see shared/research/CHUNK-SPLITTING-ANALYSIS.md):
+    - English prose: ~0.87 tokens/char
+    - Log output: ~1.47 tokens/char
+    - Stack traces: ~1.70 tokens/char
+    - Terminal output with ANSI escapes: ~2.5 tokens/char
+    - Emoji-heavy shell prompts: ~2.75+ tokens/char (worst case observed)
+    2500 chars * 3.0 = 7500 tokens, leaving ~700 token headroom in 8192 context.
+    This headroom accommodates future context prefix (~500 tokens). *)
 let max_chunk_chars = 2500
 
 (** Overlap ratio between adjacent chunks (10%).
-    Preserves context at chunk boundaries for better retrieval. *)
+    Preserves context at chunk boundaries for better retrieval.
+    Anthropic recommends 10-20% overlap. *)
 let chunk_overlap_ratio = 0.10
 
-(** Calculated overlap in characters (300 for 3000 char chunks) *)
+(** Calculated overlap in characters (250 for 2500 char chunks) *)
 let chunk_overlap_chars = int_of_float (float_of_int max_chunk_chars *. chunk_overlap_ratio)
 
-(** Stride between chunk starts = max_size - overlap (2700 chars) *)
+(** Stride between chunk starts = max_size - overlap (2250 chars) *)
 let chunk_stride_chars = max_chunk_chars - chunk_overlap_chars
 
 (* ============================================================
