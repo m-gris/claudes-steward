@@ -19,6 +19,13 @@ type qdrant_result =
   | Qd_ok
   | Qd_error of string
 
+(** Safe string extraction that truly never raises.
+    Yojson 3.0.0's to_string_option raises Type_error on non-string/non-null values.
+    This function returns None for anything that isn't a `String. *)
+let safe_to_string = function
+  | `String s -> Some s
+  | _ -> None
+
 (** Generate a deterministic numeric ID from a string (for Qdrant point IDs).
     Uses a simple hash to convert UUID-style IDs to positive integers. *)
 let string_to_point_id (s : string) : int =
@@ -92,13 +99,13 @@ let upsert_points (config : qdrant_config) (chunks : embedded_chunk list) : qdra
           | `String s -> Qd_error (Printf.sprintf "Qdrant returned status: %s" s)
           | `Assoc _ ->
               (* Error case: {"status": {"error": "message"}} *)
-              let error_msg = status_field |> member "error" |> to_string_option in
+              let error_msg = status_field |> member "error" |> safe_to_string in
               (match error_msg with
               | Some msg -> Qd_error (Printf.sprintf "Qdrant error: %s" msg)
               | None -> Qd_error (Printf.sprintf "Unexpected status object: %s" (Yojson.Safe.to_string status_field)))
           | `Null ->
               (* Check for result.status *)
-              let result_status = json |> member "result" |> member "status" |> to_string_option in
+              let result_status = json |> member "result" |> member "status" |> safe_to_string in
               (match result_status with
               | Some "completed" -> Qd_ok
               | _ -> Qd_error (Printf.sprintf "Unexpected response: %s" output))
@@ -149,7 +156,7 @@ let health_check (config : qdrant_config) : bool =
       (try
         let json = Yojson.Safe.from_string output in
         let open Yojson.Safe.Util in
-        let version = json |> member "version" |> to_string_option in
+        let version = json |> member "version" |> safe_to_string in
         Option.is_some version
       with _ -> false)
   | _ -> false
@@ -193,7 +200,7 @@ let parse_search_result (json : Yojson.Safe.t) : search_result option =
       sr_project_path = payload |> member "project_path" |> to_string;
       sr_timestamp = payload |> member "timestamp" |> to_string;
       sr_content = payload |> member "content" |> to_string;
-      sr_context = payload |> member "context" |> to_string_option;
+      sr_context = payload |> member "context" |> safe_to_string;
       sr_score = score;
     }
   with _ -> None
@@ -317,7 +324,7 @@ let scroll_all_chunk_ids (config : qdrant_config) : (string list, string) result
           let result = json |> member "result" in
           let points = result |> member "points" |> to_list in
           let chunk_ids = List.filter_map (fun p ->
-            p |> member "payload" |> member "chunk_id" |> to_string_option
+            p |> member "payload" |> member "chunk_id" |> safe_to_string
           ) points in
           let next_offset = result |> member "next_page_offset" in
           let new_acc = acc @ chunk_ids in

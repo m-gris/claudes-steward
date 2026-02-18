@@ -798,6 +798,19 @@ let test_qdrant_upsert_empty () =
   | Steward.Qdrant.Qd_ok -> ()
   | Steward.Qdrant.Qd_error _ -> Alcotest.fail "Empty upsert should succeed"
 
+let test_safe_to_string () =
+  Alcotest.(check (option string)) "string value"
+    (Some "hello") (Steward.Qdrant.safe_to_string (`String "hello"));
+  Alcotest.(check (option string)) "null value"
+    None (Steward.Qdrant.safe_to_string `Null);
+  (* These would raise Type_error with Yojson 3.0.0's to_string_option *)
+  Alcotest.(check (option string)) "object value"
+    None (Steward.Qdrant.safe_to_string (`Assoc [("error", `String "bad")]));
+  Alcotest.(check (option string)) "int value"
+    None (Steward.Qdrant.safe_to_string (`Int 42));
+  Alcotest.(check (option string)) "list value"
+    None (Steward.Qdrant.safe_to_string (`List [`String "a"]))
+
 (* --- Search options tests --- *)
 
 let test_default_search_options () =
@@ -858,6 +871,7 @@ let qdrant_tests = [
   "health check", `Slow, test_qdrant_health_check;
   "collection info", `Slow, test_qdrant_collection_info;
   "upsert empty", `Quick, test_qdrant_upsert_empty;
+  "safe_to_string handles all types", `Quick, test_safe_to_string;
   "default search options", `Quick, test_default_search_options;
   "parse search result", `Quick, test_parse_search_result;
   "search by vector integration", `Slow, test_search_by_vector_integration;
