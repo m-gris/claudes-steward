@@ -27,16 +27,16 @@ health:
 collections:
     curl -s http://localhost:{{port}}/collections | jq .
 
-# Create transcript collection (1024 dims for mxbai-embed-large)
+# Create transcript collection (768 dims for nomic-embed-text, BM25 sparse with IDF)
 create-collection:
     curl -X PUT http://localhost:{{port}}/collections/transcripts \
       -H "Content-Type: application/json" \
       -d '{ \
         "vectors": { \
-          "dense": { "size": 1024, "distance": "Cosine" } \
+          "dense": { "size": 768, "distance": "Cosine" } \
         }, \
         "sparse_vectors": { \
-          "bm25": {} \
+          "bm25": { "modifier": "idf" } \
         }, \
         "payload_schema": { \
           "session_id": { "data_type": "Keyword", "indexed": true }, \
@@ -44,6 +44,9 @@ create-collection:
           "timestamp": { "data_type": "Datetime", "indexed": true } \
         } \
       }' | jq .
+
+# Recreate collection (delete + create, for schema changes)
+recreate-collection: delete-collection create-collection
 
 # Delete transcript collection (careful!)
 delete-collection:

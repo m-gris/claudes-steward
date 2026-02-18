@@ -803,7 +803,15 @@ let test_chunk_to_point () =
   Alcotest.(check string) "chunk_id in payload" "chunk-123"
     (payload |> member "chunk_id" |> to_string);
   Alcotest.(check string) "session_id in payload" "sess-456"
-    (payload |> member "session_id" |> to_string)
+    (payload |> member "session_id" |> to_string);
+  (* Check BM25 sparse vector is present *)
+  let vector = point |> member "vector" in
+  let bm25 = vector |> member "bm25" in
+  let indices = bm25 |> member "indices" |> to_list in
+  let values = bm25 |> member "values" |> to_list in
+  Alcotest.(check bool) "bm25 has indices" true (List.length indices > 0);
+  Alcotest.(check bool) "bm25 indices = values" true
+    (List.length indices = List.length values)
 
 (* --- Integration tests (require Qdrant running) --- *)
 
@@ -1305,6 +1313,90 @@ let chunk_splitting_tests = [
 ]
 
 (* ============================================================
+   BM25 Tests
+   ============================================================ *)
+
+let test_bm25_tokenize () =
+  let tokens = Steward.Bm25.tokenize "Hello World! This is a test." in
+  Alcotest.(check (list string)) "basic tokenization"
+    ["hello"; "world"; "this"; "is"; "test"] tokens
+
+let test_bm25_tokenize_filters_short () =
+  let tokens = Steward.Bm25.tokenize "I am a big cat" in
+  (* "I", "a" are < 2 chars and should be filtered *)
+  Alcotest.(check (list string)) "filters short tokens"
+    ["am"; "big"; "cat"] tokens
+
+let test_bm25_tokenize_numbers () =
+  let tokens = Steward.Bm25.tokenize "version 42 has 3 bugs" in
+  Alcotest.(check (list string)) "handles numbers"
+    ["version"; "42"; "has"; "bugs"] tokens
+
+let test_bm25_hash_deterministic () =
+  let h1 = Steward.Bm25.hash_token "hello" in
+  let h2 = Steward.Bm25.hash_token "hello" in
+  Alcotest.(check int) "same input same hash" h1 h2
+
+let test_bm25_hash_different () =
+  let h1 = Steward.Bm25.hash_token "hello" in
+  let h2 = Steward.Bm25.hash_token "world" in
+  Alcotest.(check bool) "different inputs different hashes" true (h1 <> h2)
+
+let test_bm25_hash_positive () =
+  let h = Steward.Bm25.hash_token "test" in
+  Alcotest.(check bool) "hash is positive" true (h >= 0)
+
+let test_bm25_term_frequencies () =
+  let tokens = ["hello"; "world"; "hello"; "hello"] in
+  let freqs = Steward.Bm25.term_frequencies tokens in
+  (* hello appears 3 times, world 1 time *)
+  Alcotest.(check int) "two distinct terms" 2 (List.length freqs);
+  let hello_hash = Steward.Bm25.hash_token "hello" in
+  let hello_freq = List.assoc hello_hash freqs in
+  Alcotest.(check (float 0.01)) "hello count" 3.0 hello_freq;
+  let world_hash = Steward.Bm25.hash_token "world" in
+  let world_freq = List.assoc world_hash freqs in
+  Alcotest.(check (float 0.01)) "world count" 1.0 world_freq
+
+let test_bm25_sparse_vector () =
+  let open Steward.Types in
+  let sv = Steward.Bm25.sparse_vector_of_text "hello world hello" in
+  Alcotest.(check int) "two distinct terms" 2 (List.length sv.sv_indices);
+  Alcotest.(check int) "indices = values length"
+    (List.length sv.sv_indices) (List.length sv.sv_values);
+  (* Sorted by index *)
+  let sorted = List.sort compare sv.sv_indices = sv.sv_indices in
+  Alcotest.(check bool) "indices are sorted" true sorted
+
+let test_bm25_empty_text () =
+  let open Steward.Types in
+  let sv = Steward.Bm25.sparse_vector_of_text "" in
+  Alcotest.(check int) "empty text no indices" 0 (List.length sv.sv_indices)
+
+let test_bm25_sparse_vector_json () =
+  let open Steward.Types in
+  let sv = { sv_indices = [10; 20; 30]; sv_values = [1.0; 2.0; 3.0] } in
+  let json = Steward.Qdrant.sparse_vector_to_json sv in
+  let open Yojson.Safe.Util in
+  let indices = json |> member "indices" |> to_list |> List.map to_int in
+  let values = json |> member "values" |> to_list |> List.map to_float in
+  Alcotest.(check (list int)) "json indices" [10; 20; 30] indices;
+  Alcotest.(check (list (float 0.01))) "json values" [1.0; 2.0; 3.0] values
+
+let bm25_tests = [
+  "tokenize basic", `Quick, test_bm25_tokenize;
+  "tokenize filters short", `Quick, test_bm25_tokenize_filters_short;
+  "tokenize numbers", `Quick, test_bm25_tokenize_numbers;
+  "hash deterministic", `Quick, test_bm25_hash_deterministic;
+  "hash different", `Quick, test_bm25_hash_different;
+  "hash positive", `Quick, test_bm25_hash_positive;
+  "term frequencies", `Quick, test_bm25_term_frequencies;
+  "sparse vector", `Quick, test_bm25_sparse_vector;
+  "empty text", `Quick, test_bm25_empty_text;
+  "sparse vector json", `Quick, test_bm25_sparse_vector_json;
+]
+
+(* ============================================================
    Main
    ============================================================ *)
 
@@ -1321,4 +1413,5 @@ let () =
     "Indexer", indexer_tests;
     "AsyncEmbed", async_embed_tests;
     "ChunkSplitting", chunk_splitting_tests;
+    "BM25", bm25_tests;
   ]

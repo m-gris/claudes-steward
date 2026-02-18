@@ -280,6 +280,18 @@ type embed_result =
   | Embed_error of string
 
 (* ============================================================
+   Sparse Vector Types (BM25)
+   ============================================================ *)
+
+(** Sparse vector for BM25 keyword search.
+    Indices are token hashes, values are term frequencies.
+    When stored in Qdrant with IDF modifier, gives BM25-like ranking. *)
+type sparse_vector = {
+  sv_indices : int list;    (** Token hash indices *)
+  sv_values : float list;   (** Term frequency values *)
+}
+
+(* ============================================================
    Search Types
    ============================================================ *)
 

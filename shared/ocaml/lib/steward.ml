@@ -8,6 +8,7 @@ module Db = Db
 module Finder = Finder
 module Transcript = Transcript
 module Embed = Embed
+module Bm25 = Bm25
 module Qdrant = Qdrant
 module Discover = Discover
 module Indexer = Indexer

@@ -37,15 +37,27 @@ let string_to_point_id (s : string) : int =
   ) s;
   abs (!hash)
 
-(** Convert an embedded chunk to Qdrant point JSON *)
+(** Convert a sparse vector to Qdrant JSON format *)
+let sparse_vector_to_json (sv : sparse_vector) : Yojson.Safe.t =
+  `Assoc [
+    ("indices", `List (List.map (fun i -> `Int i) sv.sv_indices));
+    ("values", `List (List.map (fun f -> `Float f) sv.sv_values));
+  ]
+
+(** Convert an embedded chunk to Qdrant point JSON.
+    Includes both dense embedding vector and BM25 sparse vector. *)
 let chunk_to_point (ec : embedded_chunk) : Yojson.Safe.t =
   let chunk = ec.ec_chunk in
   let cid = string_of_chunk_id chunk.chunk_id in
   let sid = string_of_session_id chunk.chunk_session_id in
   let vector_list = Array.to_list ec.ec_vector |> List.map (fun f -> `Float f) in
+  let sparse = Bm25.sparse_vector_of_text chunk.chunk_content in
   `Assoc [
     ("id", `Int (string_to_point_id cid));
-    ("vector", `Assoc [("dense", `List vector_list)]);
+    ("vector", `Assoc [
+      ("dense", `List vector_list);
+      ("bm25", sparse_vector_to_json sparse);
+    ]);
     ("payload", `Assoc [
       ("chunk_id", `String cid);
       ("session_id", `String sid);
@@ -283,6 +295,74 @@ let search (config : qdrant_config) (embed_config : embed_config)
   | Embed_error msg -> Error ("Embedding failed: " ^ msg)
   | Embed_ok query_vector ->
       search_by_vector config query_vector options
+
+(** Search using BM25 sparse vectors (keyword search).
+    Tokenizes query text into a sparse vector and queries Qdrant. *)
+let search_by_sparse (config : qdrant_config) (query_text : string)
+    (options : search_options) : (search_result list, string) result =
+  let sparse = Bm25.sparse_vector_of_text query_text in
+  if sparse.sv_indices = [] then Ok []
+  else
+    (* Build filter *)
+    let filter = match options.so_project_filter with
+      | Some path ->
+          Some (`Assoc [
+            ("must", `List [
+              `Assoc [
+                ("key", `String "project_path");
+                ("match", `Assoc [("value", `String path)])
+              ]
+            ])
+          ])
+      | None -> None
+    in
+
+    let payload_fields = [
+      ("vector", `Assoc [
+        ("name", `String "bm25");
+        ("vector", sparse_vector_to_json sparse);
+      ]);
+      ("limit", `Int options.so_limit);
+      ("with_payload", `Bool true);
+    ] @ (match filter with Some f -> [("filter", f)] | None -> [])
+      @ (match options.so_score_threshold with
+         | Some t -> [("score_threshold", `Float t)]
+         | None -> [])
+    in
+    let payload = `Assoc payload_fields in
+    let payload_str = Yojson.Safe.to_string payload in
+
+    let temp_file = Filename.temp_file "qdrant_sparse_" ".json" in
+    let oc = open_out temp_file in
+    output_string oc payload_str;
+    close_out oc;
+
+    let url = Printf.sprintf "%s/collections/%s/points/search"
+      config.qd_base_url config.qd_collection in
+    let cmd = Printf.sprintf
+      "curl -s -X POST '%s' -H 'Content-Type: application/json' -d @'%s'"
+      url temp_file
+    in
+
+    let ic = Unix.open_process_in cmd in
+    let output = In_channel.input_all ic in
+    let status = Unix.close_process_in ic in
+    (try Sys.remove temp_file with _ -> ());
+
+    match status with
+    | Unix.WEXITED 0 ->
+        (try
+          let json = Yojson.Safe.from_string output in
+          let open Yojson.Safe.Util in
+          let results = json |> member "result" |> to_list in
+          let parsed = List.filter_map parse_search_result results in
+          Ok parsed
+        with
+        | Yojson.Json_error msg -> Error ("JSON parse error: " ^ msg)
+        | Yojson.Safe.Util.Type_error (msg, _) -> Error ("JSON type error: " ^ msg))
+    | Unix.WEXITED code -> Error (Printf.sprintf "curl exited with code %d: %s" code output)
+    | Unix.WSIGNALED _ -> Error "curl killed by signal"
+    | Unix.WSTOPPED _ -> Error "curl stopped"
 
 (** Scroll all chunk_ids from the collection.
     Used for incremental indexing: diff against parsed chunks. *)
