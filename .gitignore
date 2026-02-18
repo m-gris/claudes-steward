@@ -20,6 +20,11 @@ shared/ocaml/_opam/
 # Claude Code local settings (keep .claude/settings.json if present)
 .claude/projects/
 
+# Beads internals
+.beads-backup-*/
+.beads/.jsonl.lock
+.beads/.migration-hint-ts
+
 # Temporary files
 *.tmp
 *.log
