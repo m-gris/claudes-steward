@@ -1,0 +1,56 @@
+{
+  "formula": "onboard",
+  "description": "Agent onboarding workflow for claudes-steward. Wisp this on arrival to orient yourself: bd mol wisp onboard",
+  "version": 1,
+  "type": "workflow",
+  "phase": "vapor",
+  "steps": [
+    {
+      "id": "health",
+      "title": "Verify tooling health",
+      "description": "Run `bd doctor` and check for errors. If bd needs migration, run `bd migrate`. If repo fingerprint is wrong, run `bd migrate --update-repo-id`. Check `git status` for uncommitted work from a previous session. Goal: bd and git are both functional before proceeding.",
+      "type": "task",
+      "priority": 0
+    },
+    {
+      "id": "project",
+      "title": "Understand project purpose and architecture",
+      "description": "Read README.md (project overview) and DESIGN.md (full design brief). Key takeaways to internalize:\n- Purpose: reduce cognitive load managing many parallel Claude Code sessions in tmux\n- Two tools: roster (dashboard) and triage (navigator)\n- Architecture: Claude Code hooks detect state changes, persist to SQLite, expose via dashboard + keybinding\n- State machine: WORKING <-> NEEDS ATTENTION -> REMOVED\n- Primary key: tmux pane ID (not session_id, which changes on resume)\n- Tech stack: OCaml for core logic, SQLite for state, Qdrant for transcript search",
+      "type": "task",
+      "priority": 1,
+      "needs": ["health"]
+    },
+    {
+      "id": "research",
+      "title": "Read key research and findings",
+      "description": "Check these files for accumulated knowledge:\n- shared/experiments/FINDINGS.md — hook verification results (what works, what's untested)\n- shared/research/TRANSCRIPT-SEARCH-DESIGN.md — search architecture\n- shared/research/CHUNK-SPLITTING-ANALYSIS.md — embedding chunk sizing decisions\n- shared/research/SESSION-FINDER-FINDINGS.md — session discovery research\n- shared/research/LANGUAGE-CHOICE.md — why OCaml\n\nSkim, don't deep-read. You'll revisit specific docs when working on related tasks.",
+      "type": "task",
+      "priority": 2,
+      "needs": ["project"]
+    },
+    {
+      "id": "active-work",
+      "title": "Discover active and available work",
+      "description": "Run these commands and internalize the results:\n- `bd list --status=in_progress` — what was someone actively working on?\n- `bd ready` — what's unblocked and available?\n- `bd show <epic-id>` on the major epics to understand work stream structure\n- `git log --oneline -10` — what was recently committed?\n\nKey epics to know:\n- STEW-6lv: Contextual Transcript Search (the big feature)\n- STEW-078: Hook Verification Experiments\n- STEW-8mu: Agent Onboarding Workflow (meta!)\n- STEW-ebi: session_id -> tmux mapping",
+      "type": "task",
+      "priority": 1,
+      "needs": ["health"]
+    },
+    {
+      "id": "codebase",
+      "title": "Map the codebase structure",
+      "description": "Understand the repo layout:\n\nclaudes-steward/\n  README.md, DESIGN.md, VERIFICATION.md — project docs\n  roster/ — dashboard tool (future)\n  triage/ — navigation tool (future)\n  shared/\n    ocaml/ — core OCaml codebase\n      lib/ — main library modules (types.ml, qdrant.ml, indexer.ml, embed.ml, transcript.ml, etc.)\n      test/ — test suite\n      justfile — build/test recipes (use `just test`, `just build`)\n    qdrant/ — vector DB storage and config\n      justfile — server management recipes\n    research/ — design docs and analysis\n    experiments/ — hook verification logs and findings\n    hooks/ — probe.sh for hook event capture\n    schema.sql — SQLite schema for session state\n    steward.db — SQLite database\n  .beads/ — issue tracking\n\nThe shared/ocaml/_opam/ directory is the OCaml package manager switch (huge, ignore it).",
+      "type": "task",
+      "priority": 2,
+      "needs": ["project"]
+    },
+    {
+      "id": "orient",
+      "title": "Confirm orientation and report ready",
+      "description": "You should now be able to answer:\n1. What is this project and why does it exist?\n2. What are the major work streams?\n3. What was the previous session working on?\n4. What's ready to pick up?\n5. Where is the code and how to build/test it?\n\nSummarize your understanding to the user and ask what to work on. Burn this wisp when done: the steps served their purpose.",
+      "type": "task",
+      "priority": 1,
+      "needs": ["research", "active-work", "codebase"]
+    }
+  ]
+}

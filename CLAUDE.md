@@ -1,6 +1,8 @@
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+This project uses **bd** (beads) for issue tracking.
+
+**New session?** Run `bd mol wisp onboard` and follow the steps.
 
 ## Navigating Beads (Don't Just Grep!)
 
@@ -20,16 +22,6 @@ cat shared/research/TRANSCRIPT-SEARCH-DESIGN.md  # Follow references
 ```
 
 Beads descriptions often say "See shared/research/FOO.md" — follow those breadcrumbs.
-
-## Quick Reference
-
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
-```
 
 ## Landing the Plane (Session Completion)
 
