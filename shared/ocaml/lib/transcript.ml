@@ -2,6 +2,17 @@
 
 open Types
 
+(** Sanitize a byte string to valid UTF-8.
+    Replaces invalid UTF-8 sequences with U+FFFD (replacement character).
+    Uses uutf for correct, battle-tested validation. *)
+let sanitize_utf8 (s : string) : string =
+  let buf = Buffer.create (String.length s) in
+  Uutf.String.fold_utf_8 (fun () _pos -> function
+    | `Uchar u -> Uutf.Buffer.add_utf_8 buf u
+    | `Malformed _ -> Uutf.Buffer.add_utf_8 buf Uchar.rep
+  ) () s;
+  Buffer.contents buf
+
 (** Extract text content from assistant message content array *)
 let extract_assistant_content (content : Yojson.Safe.t) : string =
   match content with
@@ -30,7 +41,7 @@ let parse_message (json : Yojson.Safe.t) : transcript_message option =
       let msg_timestamp = json |> member "timestamp" |> to_string_option |> Option.value ~default:"" in
       let msg_cwd = json |> member "cwd" |> to_string_option |> Option.value ~default:"" in
       let message = json |> member "message" in
-      let msg_content = message |> member "content" |> to_string_option |> Option.value ~default:"" in
+      let msg_content = message |> member "content" |> to_string_option |> Option.value ~default:"" |> sanitize_utf8 in
       Some { msg_type = User; msg_uuid; msg_parent_uuid; msg_session_id; msg_timestamp; msg_cwd; msg_content }
   | "assistant" ->
       let msg_uuid = json |> member "uuid" |> to_string_option |> Option.value ~default:"" |> make_msg_uuid in
@@ -39,7 +50,7 @@ let parse_message (json : Yojson.Safe.t) : transcript_message option =
       let msg_timestamp = json |> member "timestamp" |> to_string_option |> Option.value ~default:"" in
       let msg_cwd = json |> member "cwd" |> to_string_option |> Option.value ~default:"" in
       let message = json |> member "message" in
-      let msg_content = extract_assistant_content (message |> member "content") in
+      let msg_content = extract_assistant_content (message |> member "content") |> sanitize_utf8 in
       Some { msg_type = Assistant; msg_uuid; msg_parent_uuid; msg_session_id; msg_timestamp; msg_cwd; msg_content }
   | _ -> None
 

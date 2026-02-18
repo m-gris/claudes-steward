@@ -578,6 +578,41 @@ let test_orphan_user_message () =
   let turns = Steward.Transcript.pair_into_turns messages "/path/to/transcript.jsonl" in
   Alcotest.(check int) "no complete turns" 0 (List.length turns)
 
+let test_sanitize_utf8_valid () =
+  (* Valid ASCII passes through unchanged *)
+  Alcotest.(check string) "ascii" "hello world" (Steward.Transcript.sanitize_utf8 "hello world");
+  (* Valid multi-byte UTF-8 passes through *)
+  Alcotest.(check string) "emoji" "\xF0\x9F\x98\x80" (Steward.Transcript.sanitize_utf8 "\xF0\x9F\x98\x80");
+  (* Valid 2-byte (é = C3 A9) *)
+  Alcotest.(check string) "e-acute" "\xC3\xA9" (Steward.Transcript.sanitize_utf8 "\xC3\xA9");
+  (* Empty string *)
+  Alcotest.(check string) "empty" "" (Steward.Transcript.sanitize_utf8 "")
+
+let test_sanitize_utf8_invalid () =
+  let replacement = "\xEF\xBF\xBD" in  (* U+FFFD *)
+  (* Lone continuation byte *)
+  Alcotest.(check string) "lone continuation"
+    replacement (Steward.Transcript.sanitize_utf8 "\x80");
+  (* Truncated 2-byte sequence *)
+  Alcotest.(check string) "truncated 2-byte"
+    replacement (Steward.Transcript.sanitize_utf8 "\xC3");
+  (* Invalid byte 0xFF *)
+  Alcotest.(check string) "0xFF byte"
+    replacement (Steward.Transcript.sanitize_utf8 "\xFF");
+  (* Invalid bytes embedded in valid text *)
+  Alcotest.(check string) "mixed valid and invalid"
+    ("hello" ^ replacement ^ "world")
+    (Steward.Transcript.sanitize_utf8 "hello\xFEworld")
+
+let test_sanitize_utf8_surrogates () =
+  let replacement = "\xEF\xBF\xBD" in
+  (* Surrogate half U+D800 encoded as ED A0 80 — must be rejected *)
+  let result = Steward.Transcript.sanitize_utf8 "\xED\xA0\x80" in
+  (* uutf should replace the invalid surrogate sequence *)
+  Alcotest.(check bool) "surrogate replaced"
+    true (String.length result > 0 && result <> "\xED\xA0\x80");
+  ignore replacement
+
 let transcript_tests = [
   "parse user message", `Quick, test_parse_user_message;
   "parse assistant message", `Quick, test_parse_assistant_message;
@@ -585,6 +620,9 @@ let transcript_tests = [
   "skip file-history", `Quick, test_skip_file_history;
   "pair into turns", `Quick, test_pair_into_turns;
   "orphan user message", `Quick, test_orphan_user_message;
+  "sanitize_utf8 valid", `Quick, test_sanitize_utf8_valid;
+  "sanitize_utf8 invalid", `Quick, test_sanitize_utf8_invalid;
+  "sanitize_utf8 surrogates", `Quick, test_sanitize_utf8_surrogates;
 ]
 
 (* ============================================================

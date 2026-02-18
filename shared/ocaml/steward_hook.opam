@@ -11,6 +11,7 @@ depends: [
   "lwt"
   "lwt_ppx"
   "cohttp-lwt-unix"
+  "uutf"
   "alcotest" {with-test}
   "alcotest-lwt" {with-test}
 ]

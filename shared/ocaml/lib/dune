@@ -1,3 +1,3 @@
 (library
  (name steward)
- (libraries yojson sqlite3 unix lwt lwt.unix cohttp-lwt-unix))
+ (libraries yojson sqlite3 unix lwt lwt.unix cohttp-lwt-unix uutf))
