@@ -12,3 +12,13 @@
  (name steward_index)
  (public_name steward-index)
  (libraries steward unix lwt lwt.unix))
+
+(executable
+ (name steward_roster)
+ (public_name steward-roster)
+ (libraries steward unix))
+
+(executable
+ (name steward_triage)
+ (public_name steward-triage)
+ (libraries steward unix))

@@ -1397,6 +1397,280 @@ let bm25_tests = [
 ]
 
 (* ============================================================
+   Test Helpers — Shared session_record builder
+   ============================================================ *)
+
+(** Build a session_record with sensible defaults, overriding as needed *)
+let make_session_record
+    ?(pane_id="%0") ?(tmux_session="dev") ?(window=1) ?(pane=0)
+    ?(session_id="sess-1") ?(cwd="/home/user/project")
+    ?(transcript_path="/tmp/transcript.jsonl")
+    ?(state=Working) ?(first_seen="2026-02-10T10:00:00Z")
+    ?(last_updated="2026-02-10T12:00:00Z") ?(last_session_id=None)
+    () : session_record =
+  let location = Printf.sprintf "%s:%d.%d" tmux_session window pane in
+  {
+    tmux = { pane_id; session = tmux_session; window; pane; location };
+    session_id = make_session_id session_id;
+    cwd;
+    transcript_path;
+    state;
+    first_seen;
+    last_updated;
+    last_session_id = Option.map make_session_id last_session_id;
+  }
+
+(* ============================================================
+   Roster Tests (Pure Display Logic)
+   ============================================================ *)
+
+let test_roster_state_indicator_working () =
+  Alcotest.(check string) "working indicator"
+    "⚙" (Steward.Roster.state_indicator Working)
+
+let test_roster_state_indicator_done () =
+  Alcotest.(check string) "done indicator"
+    "✓" (Steward.Roster.state_indicator (Needs_attention Done))
+
+let test_roster_state_indicator_permission () =
+  Alcotest.(check string) "permission indicator"
+    "⚠" (Steward.Roster.state_indicator (Needs_attention Permission))
+
+let test_roster_state_indicator_question () =
+  Alcotest.(check string) "question indicator"
+    "?" (Steward.Roster.state_indicator (Needs_attention Question))
+
+let test_roster_state_label_working () =
+  Alcotest.(check string) "working label"
+    "working" (Steward.Roster.state_label Working)
+
+let test_roster_state_label_done () =
+  Alcotest.(check string) "done label"
+    "done" (Steward.Roster.state_label (Needs_attention Done))
+
+let test_roster_state_label_permission () =
+  Alcotest.(check string) "permission label"
+    "permission" (Steward.Roster.state_label (Needs_attention Permission))
+
+let test_roster_state_label_question () =
+  Alcotest.(check string) "question label"
+    "question" (Steward.Roster.state_label (Needs_attention Question))
+
+let test_roster_shorten_cwd_match () =
+  Alcotest.(check string) "replaces home with ~"
+    "~/project" (Steward.Roster.shorten_cwd "/home/user" "/home/user/project")
+
+let test_roster_shorten_cwd_no_match () =
+  Alcotest.(check string) "no match passes through"
+    "/other/path" (Steward.Roster.shorten_cwd "/home/user" "/other/path")
+
+let test_roster_shorten_cwd_exact_home () =
+  Alcotest.(check string) "exact home becomes ~"
+    "~" (Steward.Roster.shorten_cwd "/home/user" "/home/user")
+
+let test_roster_group_by_tmux_session () =
+  let records = [
+    make_session_record ~pane_id:"%0" ~tmux_session:"dev" ~window:1 ~pane:0 ();
+    make_session_record ~pane_id:"%1" ~tmux_session:"dev" ~window:2 ~pane:0 ();
+    make_session_record ~pane_id:"%2" ~tmux_session:"work" ~window:1 ~pane:0 ();
+  ] in
+  let groups = Steward.Roster.group_by_tmux_session records in
+  Alcotest.(check int) "two groups" 2 (List.length groups);
+  let dev_group = List.hd groups in
+  Alcotest.(check string) "first group is dev" "dev" dev_group.Steward.Roster.tmux_session_name;
+  Alcotest.(check int) "dev has 2 sessions" 2 (List.length dev_group.Steward.Roster.sessions)
+
+let test_roster_group_preserves_order () =
+  let records = [
+    make_session_record ~pane_id:"%0" ~tmux_session:"alpha" ();
+    make_session_record ~pane_id:"%1" ~tmux_session:"beta" ();
+    make_session_record ~pane_id:"%2" ~tmux_session:"alpha" ();
+  ] in
+  let groups = Steward.Roster.group_by_tmux_session records in
+  Alcotest.(check int) "two groups" 2 (List.length groups);
+  let first = List.hd groups in
+  Alcotest.(check string) "first group is alpha" "alpha" first.Steward.Roster.tmux_session_name
+
+let test_roster_group_empty () =
+  let groups = Steward.Roster.group_by_tmux_session [] in
+  Alcotest.(check int) "no groups" 0 (List.length groups)
+
+let test_roster_format_row () =
+  let record = make_session_record
+    ~pane_id:"%5" ~tmux_session:"dev" ~window:2 ~pane:1
+    ~cwd:"/home/user/myproject" ~state:Working () in
+  let row = Steward.Roster.format_row "/home/user" record in
+  (* Row should contain the location, indicator, and shortened cwd *)
+  Alcotest.(check bool) "contains location" true
+    (Steward.Discover.string_contains ~needle:"2.1" row);
+  Alcotest.(check bool) "contains indicator" true
+    (Steward.Discover.string_contains ~needle:"⚙" row);
+  Alcotest.(check bool) "contains shortened cwd" true
+    (Steward.Discover.string_contains ~needle:"~/myproject" row)
+
+let test_roster_format_roster_empty () =
+  let output = Steward.Roster.format_roster "/home/user" [] in
+  Alcotest.(check bool) "empty roster message" true
+    (String.length output > 0)
+
+let test_roster_session_to_json () =
+  let record = make_session_record
+    ~pane_id:"%5" ~tmux_session:"dev" ~window:2 ~pane:1
+    ~session_id:"abc123" ~cwd:"/home/user/project"
+    ~state:(Needs_attention Done) () in
+  let json = Steward.Roster.session_to_json record in
+  let open Yojson.Safe.Util in
+  Alcotest.(check string) "pane_id" "%5" (json |> member "pane_id" |> to_string);
+  Alcotest.(check string) "tmux_session" "dev" (json |> member "tmux_session" |> to_string);
+  Alcotest.(check string) "state" "needs_attention:done" (json |> member "state" |> to_string);
+  Alcotest.(check string) "session_id" "abc123" (json |> member "session_id" |> to_string)
+
+let test_roster_to_json () =
+  let records = [
+    make_session_record ~pane_id:"%0" ();
+    make_session_record ~pane_id:"%1" ();
+  ] in
+  let json = Steward.Roster.roster_to_json records in
+  match json with
+  | `List items -> Alcotest.(check int) "two items" 2 (List.length items)
+  | _ -> Alcotest.fail "Expected JSON array"
+
+let roster_tests = [
+  "state_indicator Working", `Quick, test_roster_state_indicator_working;
+  "state_indicator Done", `Quick, test_roster_state_indicator_done;
+  "state_indicator Permission", `Quick, test_roster_state_indicator_permission;
+  "state_indicator Question", `Quick, test_roster_state_indicator_question;
+  "state_label Working", `Quick, test_roster_state_label_working;
+  "state_label Done", `Quick, test_roster_state_label_done;
+  "state_label Permission", `Quick, test_roster_state_label_permission;
+  "state_label Question", `Quick, test_roster_state_label_question;
+  "shorten_cwd match", `Quick, test_roster_shorten_cwd_match;
+  "shorten_cwd no match", `Quick, test_roster_shorten_cwd_no_match;
+  "shorten_cwd exact home", `Quick, test_roster_shorten_cwd_exact_home;
+  "group_by_tmux_session", `Quick, test_roster_group_by_tmux_session;
+  "group preserves order", `Quick, test_roster_group_preserves_order;
+  "group empty", `Quick, test_roster_group_empty;
+  "format_row", `Quick, test_roster_format_row;
+  "format_roster empty", `Quick, test_roster_format_roster_empty;
+  "session_to_json", `Quick, test_roster_session_to_json;
+  "roster_to_json", `Quick, test_roster_to_json;
+]
+
+(* ============================================================
+   Triage Tests (Pure Prioritization Logic)
+   ============================================================ *)
+
+let test_triage_tier_of_reason_permission () =
+  Alcotest.(check int) "permission is tier 0"
+    0 (Steward.Triage.rank_of_tier (Steward.Triage.tier_of_reason Permission))
+
+let test_triage_tier_of_reason_question () =
+  Alcotest.(check int) "question is tier 1"
+    1 (Steward.Triage.rank_of_tier (Steward.Triage.tier_of_reason Question))
+
+let test_triage_tier_of_reason_done () =
+  Alcotest.(check int) "done is tier 2"
+    2 (Steward.Triage.rank_of_tier (Steward.Triage.tier_of_reason Done))
+
+let test_triage_sort_by_priority () =
+  let records = [
+    make_session_record ~pane_id:"%0" ~state:(Needs_attention Done) ~last_updated:"2026-02-10T10:00:00Z" ();
+    make_session_record ~pane_id:"%1" ~state:(Needs_attention Permission) ~last_updated:"2026-02-10T11:00:00Z" ();
+    make_session_record ~pane_id:"%2" ~state:(Needs_attention Question) ~last_updated:"2026-02-10T09:00:00Z" ();
+  ] in
+  let sorted = Steward.Triage.sort_by_priority records in
+  (* Permission first, then Question, then Done *)
+  let states = List.map (fun (r : session_record) -> r.state) sorted in
+  Alcotest.(check state_testable) "first is permission"
+    (Needs_attention Permission) (List.nth states 0);
+  Alcotest.(check state_testable) "second is question"
+    (Needs_attention Question) (List.nth states 1);
+  Alcotest.(check state_testable) "third is done"
+    (Needs_attention Done) (List.nth states 2)
+
+let test_triage_sort_stable_within_tier () =
+  (* Two permissions: oldest should come first *)
+  let records = [
+    make_session_record ~pane_id:"%0" ~state:(Needs_attention Permission) ~last_updated:"2026-02-10T12:00:00Z" ();
+    make_session_record ~pane_id:"%1" ~state:(Needs_attention Permission) ~last_updated:"2026-02-10T10:00:00Z" ();
+  ] in
+  let sorted = Steward.Triage.sort_by_priority records in
+  let first_pane = (List.hd sorted).tmux.pane_id in
+  Alcotest.(check string) "oldest first" "%1" first_pane
+
+let test_triage_next_returns_highest () =
+  let records = [
+    make_session_record ~pane_id:"%0" ~state:(Needs_attention Done) ();
+    make_session_record ~pane_id:"%1" ~state:(Needs_attention Permission) ();
+  ] in
+  match Steward.Triage.next records with
+  | None -> Alcotest.fail "Expected Some"
+  | Some r -> Alcotest.(check string) "permission first" "%1" r.tmux.pane_id
+
+let test_triage_next_empty () =
+  Alcotest.(check bool) "empty returns None"
+    true (Steward.Triage.next [] = None)
+
+let test_triage_format_waiting_minutes () =
+  let result = Steward.Triage.format_waiting "2026-02-10T10:00:00Z" "2026-02-10T10:05:00Z" in
+  Alcotest.(check bool) "contains 5" true
+    (Steward.Discover.string_contains ~needle:"5" result);
+  Alcotest.(check bool) "contains min" true
+    (Steward.Discover.string_contains ~needle:"min" result)
+
+let test_triage_format_waiting_hours () =
+  let result = Steward.Triage.format_waiting "2026-02-10T10:00:00Z" "2026-02-10T12:30:00Z" in
+  Alcotest.(check bool) "contains h" true
+    (Steward.Discover.string_contains ~needle:"h" result)
+
+let test_triage_entry_to_json () =
+  let record = make_session_record
+    ~pane_id:"%5" ~tmux_session:"dev" ~window:2 ~pane:1
+    ~state:(Needs_attention Permission) () in
+  let json = Steward.Triage.entry_to_json record in
+  let open Yojson.Safe.Util in
+  Alcotest.(check string) "pane_id" "%5" (json |> member "pane_id" |> to_string);
+  Alcotest.(check string) "reason" "permission" (json |> member "reason" |> to_string);
+  Alcotest.(check string) "location" "dev:2.1" (json |> member "location" |> to_string)
+
+let test_triage_to_json () =
+  let records = [
+    make_session_record ~pane_id:"%0" ~state:(Needs_attention Done) ();
+    make_session_record ~pane_id:"%1" ~state:(Needs_attention Permission) ();
+  ] in
+  let json = Steward.Triage.triage_to_json records in
+  match json with
+  | `List items -> Alcotest.(check int) "two items" 2 (List.length items)
+  | _ -> Alcotest.fail "Expected JSON array"
+
+let test_triage_sort_filters_working () =
+  (* sort_by_priority only operates on needs_attention records;
+     Working sessions should be filtered out or ignored *)
+  let records = [
+    make_session_record ~pane_id:"%0" ~state:Working ();
+    make_session_record ~pane_id:"%1" ~state:(Needs_attention Permission) ();
+  ] in
+  let sorted = Steward.Triage.sort_by_priority records in
+  (* Permission should come first; Working is lowest priority *)
+  let first = List.hd sorted in
+  Alcotest.(check string) "permission first" "%1" first.tmux.pane_id
+
+let triage_tests = [
+  "tier_of_reason Permission", `Quick, test_triage_tier_of_reason_permission;
+  "tier_of_reason Question", `Quick, test_triage_tier_of_reason_question;
+  "tier_of_reason Done", `Quick, test_triage_tier_of_reason_done;
+  "sort_by_priority", `Quick, test_triage_sort_by_priority;
+  "sort stable within tier", `Quick, test_triage_sort_stable_within_tier;
+  "next returns highest", `Quick, test_triage_next_returns_highest;
+  "next empty", `Quick, test_triage_next_empty;
+  "format_waiting minutes", `Quick, test_triage_format_waiting_minutes;
+  "format_waiting hours", `Quick, test_triage_format_waiting_hours;
+  "entry_to_json", `Quick, test_triage_entry_to_json;
+  "triage_to_json", `Quick, test_triage_to_json;
+  "sort filters working", `Quick, test_triage_sort_filters_working;
+]
+
+(* ============================================================
    Main
    ============================================================ *)
 
@@ -1414,4 +1688,6 @@ let () =
     "AsyncEmbed", async_embed_tests;
     "ChunkSplitting", chunk_splitting_tests;
     "BM25", bm25_tests;
+    "Roster", roster_tests;
+    "Triage", triage_tests;
   ]

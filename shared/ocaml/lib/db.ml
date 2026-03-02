@@ -102,6 +102,71 @@ let delete_session (db : Sqlite3.db) (pane_id : string) : unit =
   let _ = Sqlite3.exec db sql in
   ()
 
+(** Parse a row from a prepared statement into a session_record *)
+let parse_session_row (stmt : Sqlite3.stmt) : session_record option =
+  let get_text i = match Sqlite3.column stmt i with
+    | Sqlite3.Data.TEXT s -> s
+    | _ -> ""
+  in
+  let get_int i = match Sqlite3.column stmt i with
+    | Sqlite3.Data.INT n -> Int64.to_int n
+    | _ -> 0
+  in
+  let get_text_opt i = match Sqlite3.column stmt i with
+    | Sqlite3.Data.TEXT s -> Some s
+    | _ -> None
+  in
+  let tmux = {
+    pane_id = get_text 0;
+    session = get_text 1;
+    window = get_int 2;
+    pane = get_int 3;
+    location = get_text 4;
+  } in
+  match state_of_db (get_text 8) with
+  | None -> None
+  | Some state ->
+      Some {
+        tmux;
+        session_id = make_session_id (get_text 5);
+        cwd = get_text 6;
+        transcript_path = get_text 7;
+        state;
+        first_seen = get_text 9;
+        last_updated = get_text 10;
+        last_session_id = get_text_opt 11 |> Option.map make_session_id;
+      }
+
+(** Collect rows from a prepared statement into a session_record list *)
+let collect_rows (stmt : Sqlite3.stmt) : session_record list =
+  let records = ref [] in
+  while Sqlite3.step stmt = Sqlite3.Rc.ROW do
+    match parse_session_row stmt with
+    | Some r -> records := r :: !records
+    | None -> ()
+  done;
+  let _ = Sqlite3.finalize stmt in
+  List.rev !records
+
+(** The column list used by all session queries *)
+let session_columns = "tmux_pane_id, tmux_session, tmux_window, tmux_pane, tmux_location, session_id, cwd, transcript_path, state, first_seen, last_updated, last_session_id"
+
+(** List all sessions, ordered by tmux location (for roster) *)
+let list_sessions (db : Sqlite3.db) : session_record list =
+  let sql = Printf.sprintf
+    "SELECT %s FROM sessions ORDER BY tmux_session, tmux_window, tmux_pane"
+    session_columns
+  in
+  collect_rows (Sqlite3.prepare db sql)
+
+(** List sessions needing attention, oldest first (for triage) *)
+let list_needs_attention (db : Sqlite3.db) : session_record list =
+  let sql = Printf.sprintf
+    "SELECT %s FROM sessions WHERE state LIKE 'needs_attention:%%' ORDER BY last_updated ASC"
+    session_columns
+  in
+  collect_rows (Sqlite3.prepare db sql)
+
 (** Open database, initialize if needed *)
 let open_db () : Sqlite3.db =
   let path = db_path () in

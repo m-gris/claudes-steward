@@ -29,3 +29,19 @@ let capture () : tmux_context option =
         let location = Printf.sprintf "%s:%d.%d" session window pane in
         Some { pane_id; session; window; pane; location }
     | _ -> None
+
+(** Run a command and check exit code. Returns true on success. *)
+let run_cmd_ok (cmd : string) : bool =
+  try
+    let exit_code = Sys.command cmd in
+    exit_code = 0
+  with _ -> false
+
+(** Switch tmux focus to the given pane_id (e.g., "%318").
+    Tries select-pane first (same session), falls back to switch-client (cross-session). *)
+let switch_to_pane (pane_id : string) : bool =
+  let select = Printf.sprintf "tmux select-pane -t '%s'" pane_id in
+  if run_cmd_ok select then true
+  else
+    let switch = Printf.sprintf "tmux switch-client -t '%s'" pane_id in
+    run_cmd_ok switch

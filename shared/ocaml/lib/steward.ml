@@ -13,3 +13,5 @@ module Qdrant = Qdrant
 module Discover = Discover
 module Indexer = Indexer
 module Async_embed = Async_embed
+module Roster = Roster
+module Triage = Triage
