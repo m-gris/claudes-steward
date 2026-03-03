@@ -2,10 +2,14 @@
 
 open Types
 
-(** Database path — uses STEWARD_DB env var or default *)
+(** XDG data directory for all claude-steward runtime state *)
+let data_dir () : string =
+  Sys.getenv "HOME" ^ "/.local/share/claude-steward"
+
+(** Database path — uses STEWARD_DB env var or XDG default *)
 let db_path () : string =
   Sys.getenv_opt "STEWARD_DB"
-  |> Option.value ~default:(Sys.getenv "HOME" ^ "/DATA_PROG/AI-TOOLING/claudes-steward/shared/steward.db")
+  |> Option.value ~default:(data_dir () ^ "/steward.db")
 
 (** Initialize database with schema if needed *)
 let init_db (db : Sqlite3.db) : unit =
@@ -170,6 +174,14 @@ let list_needs_attention (db : Sqlite3.db) : session_record list =
 (** Open database, initialize if needed *)
 let open_db () : Sqlite3.db =
   let path = db_path () in
+  let dir = Filename.dirname path in
+  let rec mkdir_p d =
+    if not (Sys.file_exists d) then begin
+      mkdir_p (Filename.dirname d);
+      Unix.mkdir d 0o755
+    end
+  in
+  mkdir_p dir;
   let db = Sqlite3.db_open path in
   init_db db;
   db

@@ -14,8 +14,8 @@ if [[ ! -x "$BINARY" ]]; then
     exit 0
 fi
 
-# Export DB path (use project-local db by default)
-export STEWARD_DB="${STEWARD_DB:-$SCRIPT_DIR/../steward.db}"
+# DB path: XDG default lives in ~/.local/share/claude-steward/steward.db
+# The OCaml binary handles this internally; only override via STEWARD_DB if needed
 
 # Run the OCaml binary, piping stdin through
 exec "$BINARY"
