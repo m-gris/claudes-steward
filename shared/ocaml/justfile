@@ -54,6 +54,18 @@ fmt:
     {{opam_env}} dune fmt
 
 # ============================================================================
+# Install
+# ============================================================================
+
+# Install binaries to ~/.local/bin/
+install:
+    {{opam_env}} dune install --prefix ~/.local
+
+# Uninstall binaries from ~/.local/bin/
+uninstall:
+    {{opam_env}} dune uninstall --prefix ~/.local
+
+# ============================================================================
 # Dependencies
 # ============================================================================
 

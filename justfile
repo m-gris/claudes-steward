@@ -22,6 +22,18 @@ fmt:
     just shared/ocaml/fmt
 
 # ============================================================================
+# Install (delegates to OCaml sub-project)
+# ============================================================================
+
+# Install all binaries to ~/.local/bin/
+install: build
+    just shared/ocaml/install
+
+# Uninstall binaries from ~/.local/bin/
+uninstall:
+    just shared/ocaml/uninstall
+
+# ============================================================================
 # Qdrant (delegates to Qdrant sub-project)
 # ============================================================================
 
