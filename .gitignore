@@ -25,6 +25,12 @@ shared/ocaml/_opam/
 .beads/.jsonl.lock
 .beads/.migration-hint-ts
 
+# Qdrant runtime data
+shared/qdrant/storage/
+
+# Serena MCP config
+.serena/
+
 # Temporary files
 *.tmp
 *.log
