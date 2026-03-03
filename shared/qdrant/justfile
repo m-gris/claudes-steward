@@ -1,17 +1,22 @@
 # Qdrant server management for claudes-steward
 
 qdrant_bin := env("HOME") + "/.local/bin/qdrant"
-storage_dir := justfile_directory() + "/storage"
+data_dir := env("HOME") + "/.local/share/claude-steward"
+storage_dir := data_dir + "/qdrant"
 port := "6333"
 
 # Start Qdrant server (foreground)
 start:
-    cd {{justfile_directory()}} && {{qdrant_bin}} --config-path config/config.yaml
+    cd {{justfile_directory()}} && \
+      QDRANT__STORAGE__STORAGE_PATH={{storage_dir}} \
+      {{qdrant_bin}} --config-path config/config.yaml
 
 # Start Qdrant server (background)
 start-bg:
-    cd {{justfile_directory()}} && nohup {{qdrant_bin}} --config-path config/config.yaml > qdrant.log 2>&1 &
-    @echo "Qdrant started on port {{port}}, logs at {{justfile_directory()}}/qdrant.log"
+    cd {{justfile_directory()}} && \
+      QDRANT__STORAGE__STORAGE_PATH={{storage_dir}} \
+      nohup {{qdrant_bin}} --config-path config/config.yaml > qdrant.log 2>&1 &
+    @echo "Qdrant started on port {{port}}, storage at {{storage_dir}}"
     @sleep 1
     @just health
 

@@ -27,6 +27,8 @@ shared/ocaml/_opam/
 
 # Qdrant runtime data
 shared/qdrant/storage/
+shared/qdrant/.qdrant-initialized
+shared/qdrant/snapshots/
 
 # Serena MCP config
 .serena/

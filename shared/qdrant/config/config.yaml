@@ -1,4 +1,6 @@
 storage:
+  # Overridden by QDRANT__STORAGE__STORAGE_PATH in justfile
+  # Default used only if launched without the justfile
   storage_path: ./storage
 
 service:
