@@ -36,3 +36,6 @@ shared/qdrant/snapshots/
 # Temporary files
 *.tmp
 *.log
+
+# Dolt database files (added by bd init)
+.dolt/
